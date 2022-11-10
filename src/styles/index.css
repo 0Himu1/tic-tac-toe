@@ -12,7 +12,7 @@
 
 html,
 body {
-  colour: #444;
+  color: #444;
 }
 
 .game {
@@ -29,6 +29,7 @@ body {
   font-family: "Poppins", sans-serif;
   color: #fff;
   font-size: 30px;
+  text-align: center;
   align-items: center;
   justify-content: center;
 }

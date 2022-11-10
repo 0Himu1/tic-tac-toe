@@ -41,70 +41,56 @@ class Game extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      history: [
-        {
-          squares: Array(9).fill(null),
-        },
-      ],
-      stepNumber: 0,
+      squares: Array(9).fill(null),
       xIsNext: true,
     };
   }
 
   handleClick(i) {
-    const history = this.state.history.slice(0, this.state.stepNumber + 1);
-    const current = history[history.length - 1];
-    const squares = current.squares.slice();
+    const squares = this.state.squares.slice();
     if (calculateWinner(squares) || squares[i]) {
       return;
     }
     squares[i] = this.state.xIsNext ? "X" : "O";
     this.setState({
-      history: history.concat([
-        {
-          squares: squares,
-        },
-      ]),
-      stepNumber: history.length,
+      squares: squares,
       xIsNext: !this.state.xIsNext,
     });
   }
 
-  jumpTo(step) {
-    this.setState({
-      stepNumber: step,
-      xIsNext: step % 2 === 0,
-    });
+  resetGame() {
+    const current = this.state.squares;
+    const winner = calculateWinner(current);
+    if (winner) {
+      this.setState({
+        squares: Array(9).fill(null),
+        xIsNext: !this.state.xIsNext,
+      });
+    }
   }
 
   render() {
-    const history = this.state.history;
-    const current = history[this.state.stepNumber];
-    const winner = calculateWinner(current.squares);
-
-    const moves = history.map((step, move) => {
-      const desc = move ? `Go to move ${move}` : `Go to game start`;
-      return (
-        <li key={move}>
-          <button onClick={() => this.jumpTo(move)}>{desc}</button>
-        </li>
-      );
-    });
+    const current = this.state.squares;
+    const winner = calculateWinner(current);
 
     let status;
     if (winner) {
-      status = `Winner is ${winner}`;
+      status = (
+        <div>
+          <h1>{`Winner is ${winner}`}</h1>
+          <button>Start a New Game</button>
+        </div>
+      );
     } else {
       status = `Next player: ${this.state.xIsNext ? "X" : "O"}`;
     }
 
     return (
       <div className="game">
-        <div className="status">
+        <div className="status" onClick={() => this.resetGame()}>
           <h1>{status}</h1>
-          <ol className="hidden">{moves}</ol>
         </div>
-        <Board squares={current.squares} onClick={(i) => this.handleClick(i)} />
+        <Board squares={current} onClick={(i) => this.handleClick(i)} />
       </div>
     );
   }

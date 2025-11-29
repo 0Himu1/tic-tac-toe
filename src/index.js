@@ -1,132 +1,253 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/index.css';
+import ParticlesBackground from './components/ParticlesBackground';
+import { getBestMove, checkWinner } from './utils/tickyBot';
+import { FaRobot, FaUser, FaUsers } from 'react-icons/fa';
+import { GiArtificialIntelligence } from 'react-icons/gi';
 
-function Square(props) {
+function Square({ value, onClick, index }) {
+	const className = `square ${value ? 'filled' : ''} ${
+		value ? value.toLowerCase() : ''
+	}`;
+
 	return (
-		<div className="square" onClick={props.onClick}>
-			{props.value}
+		<div className={className} onClick={onClick}>
+			{value}
 		</div>
 	);
 }
 
-class Board extends React.Component {
-	renderSquare(i) {
-		return (
-			<Square
-				value={this.props.squares[i]}
-				onClick={() => this.props.onClick(i)}
-			/>
-		);
-	}
-
-	render() {
-		return (
-			<div className="container">
-				{this.renderSquare(0)}
-				{this.renderSquare(1)}
-				{this.renderSquare(2)}
-				{this.renderSquare(3)}
-				{this.renderSquare(4)}
-				{this.renderSquare(5)}
-				{this.renderSquare(6)}
-				{this.renderSquare(7)}
-				{this.renderSquare(8)}
-			</div>
-		);
-	}
+function Board({ squares, onClick, disabled }) {
+	return (
+		<div className="container">
+			{squares.map((square, i) => (
+				<Square
+					key={i}
+					value={square}
+					onClick={() => !disabled && onClick(i)}
+					index={i}
+				/>
+			))}
+		</div>
+	);
 }
 
-class Game extends React.Component {
-	constructor(props) {
-		super(props);
-		this.state = {
-			squares: Array(9).fill(null),
-			xIsNext: true,
-		};
-	}
+function Game() {
+	const [squares, setSquares] = useState(Array(9).fill(null));
+	const [xIsNext, setXIsNext] = useState(true);
+	const [gameMode, setGameMode] = useState('pvp'); // 'pvp' or 'pvbot'
+	const [botDifficulty, setBotDifficulty] = useState('pro'); // 'friendly' or 'pro'
+	const [isThinking, setIsThinking] = useState(false);
 
-	handleClick(i) {
-		const squares = this.state.squares.slice();
-		if (calculateWinner(squares) || squares[i]) {
+	const isBoardFull = squares => {
+		return squares.every(square => square !== null);
+	};
+
+	useEffect(() => {
+		// Bot's turn
+		if (
+			gameMode === 'pvbot' &&
+			!xIsNext &&
+			!checkWinner(squares) &&
+			!isBoardFull(squares)
+		) {
+			setIsThinking(true);
+
+			// Add delay to make it feel more natural
+			const thinkingTime = botDifficulty === 'pro' ? 800 : 500;
+
+			setTimeout(() => {
+				const botMove = getBestMove(squares, 'O', 'X', botDifficulty);
+				if (botMove !== null) {
+					const newSquares = squares.slice();
+					newSquares[botMove] = 'O';
+					setSquares(newSquares);
+					setXIsNext(true);
+				}
+				setIsThinking(false);
+			}, thinkingTime);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [xIsNext, gameMode, botDifficulty]);
+
+	const handleClick = i => {
+		const newSquares = squares.slice();
+
+		// Prevent clicking if game is over or square is filled
+		if (checkWinner(newSquares) || newSquares[i] || isBoardFull(newSquares)) {
 			return;
 		}
-		squares[i] = this.state.xIsNext ? 'X' : 'O';
-		this.setState({
-			squares: squares,
-			xIsNext: !this.state.xIsNext,
-		});
-	}
 
-	resetGame() {
-		const current = this.state.squares;
-		const winner = calculateWinner(current);
-		const isGameOver = current.every(square => square !== null);
-
-		if (winner) {
-			this.setState({
-				squares: Array(9).fill(null),
-				xIsNext: true,
-			});
-		} else if (isGameOver) {
-			this.setState({
-				squares: Array(9).fill(null),
-				xIsNext: true,
-			});
-		}
-	}
-
-	render() {
-		const current = this.state.squares;
-		const winner = calculateWinner(current);
-		const isGameOver = current.every(square => square !== null);
-
-		let status;
-		if (winner) {
-			status = (
-				<div>
-					<h1>{`Winner is ${winner}`}</h1>
-					<button>Start a New Game</button>
-				</div>
-			);
-		} else if (isGameOver) {
-			status = `Reset Game`;
-		} else {
-			status = `Next player: ${this.state.xIsNext ? 'X' : 'O'}`;
+		// Prevent player from clicking during bot's turn
+		if (gameMode === 'pvbot' && !xIsNext) {
+			return;
 		}
 
-		return (
-			<div className="game">
-				<div className="status" onClick={() => this.resetGame()}>
-					<h1>{status}</h1>
+		newSquares[i] = xIsNext ? 'X' : 'O';
+		setSquares(newSquares);
+		setXIsNext(!xIsNext);
+	};
+
+	const resetGame = () => {
+		setSquares(Array(9).fill(null));
+		setXIsNext(true);
+		setIsThinking(false);
+	};
+
+	const changeGameMode = mode => {
+		setGameMode(mode);
+		resetGame();
+	};
+
+	const changeBotDifficulty = difficulty => {
+		setBotDifficulty(difficulty);
+		if (gameMode === 'pvbot') {
+			resetGame();
+		}
+	};
+
+	const winner = checkWinner(squares);
+	const boardFull = isBoardFull(squares);
+
+	let status;
+	if (winner) {
+		const winnerName =
+			gameMode === 'pvbot' && winner === 'O' ? 'Ticky' : `Player ${winner}`;
+		status = (
+			<div className="status">
+				<div className="winner-announcement">🎉 {winnerName} Wins! 🎉</div>
+				<button className="btn btn-primary reset-btn" onClick={resetGame}>
+					Play Again
+				</button>
+			</div>
+		);
+	} else if (boardFull) {
+		status = (
+			<div className="status">
+				<div className="status-text">It's a Draw! 🤝</div>
+				<button className="btn btn-primary reset-btn" onClick={resetGame}>
+					Play Again
+				</button>
+			</div>
+		);
+	} else {
+		const nextPlayer = xIsNext ? 'X' : 'O';
+		const playerName =
+			gameMode === 'pvbot'
+				? xIsNext
+					? 'Your Turn'
+					: isThinking
+					? 'Ticky is thinking...'
+					: "Ticky's Turn"
+				: `Player ${nextPlayer}'s Turn`;
+
+		status = (
+			<div className="status">
+				<div className="status-text">
+					{gameMode === 'pvbot' && !xIsNext ? (
+						<GiArtificialIntelligence />
+					) : (
+						<FaUser />
+					)}
+					{playerName}
 				</div>
-				<Board squares={current} onClick={i => this.handleClick(i)} />
 			</div>
 		);
 	}
+
+	return (
+		<>
+			<ParticlesBackground />
+			<div className="game">
+				<div className="game-header">
+					<h1 className="game-title">Tic-Tac-Toe</h1>
+					<p className="game-subtitle">Challenge Ticky, the AI bot!</p>
+				</div>
+
+				<div className="controls">
+					<div className="control-group">
+						<span className="control-label">Game Mode</span>
+						<div className="btn-group">
+							<button
+								className={`btn btn-secondary ${
+									gameMode === 'pvp' ? 'active' : ''
+								}`}
+								onClick={() => changeGameMode('pvp')}
+							>
+								<FaUsers /> Player vs Player
+							</button>
+							<button
+								className={`btn btn-secondary ${
+									gameMode === 'pvbot' ? 'active' : ''
+								}`}
+								onClick={() => changeGameMode('pvbot')}
+							>
+								<FaRobot /> vs Ticky
+							</button>
+						</div>
+					</div>
+
+					{gameMode === 'pvbot' && (
+						<div className="control-group">
+							<span className="control-label">Ticky's Mood</span>
+							<div className="btn-group">
+								<button
+									className={`btn btn-secondary ${
+										botDifficulty === 'friendly' ? 'active' : ''
+									}`}
+									onClick={() => changeBotDifficulty('friendly')}
+								>
+									😊 Friendly
+								</button>
+								<button
+									className={`btn btn-secondary ${
+										botDifficulty === 'pro' ? 'active' : ''
+									}`}
+									onClick={() => changeBotDifficulty('pro')}
+								>
+									🔥 Pro
+								</button>
+							</div>
+						</div>
+					)}
+				</div>
+
+				{gameMode === 'pvbot' && (
+					<div className="bot-indicator">
+						<div className="bot-avatar">
+							<GiArtificialIntelligence />
+						</div>
+						<div className="bot-info">
+							<div className="bot-name">Ticky</div>
+							<div className="bot-mode">
+								{botDifficulty === 'pro'
+									? 'Pro Mode - Unbeatable!'
+									: 'Friendly Mode - Having Fun!'}
+							</div>
+						</div>
+					</div>
+				)}
+
+				{status}
+
+				<Board
+					squares={squares}
+					onClick={handleClick}
+					disabled={isThinking || winner || boardFull}
+				/>
+
+				{!winner && !boardFull && (
+					<button className="btn btn-secondary reset-btn" onClick={resetGame}>
+						Reset Game
+					</button>
+				)}
+			</div>
+		</>
+	);
 }
 
 // ========================================
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<Game />);
-
-function calculateWinner(squares) {
-	const lines = [
-		[0, 1, 2],
-		[3, 4, 5],
-		[6, 7, 8],
-		[0, 3, 6],
-		[1, 4, 7],
-		[2, 5, 8],
-		[0, 4, 8],
-		[2, 4, 6],
-	];
-	for (let i = 0; i < lines.length; i++) {
-		const [a, b, c] = lines[i];
-		if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-			return squares[a];
-		}
-	}
-	return null;
-}
